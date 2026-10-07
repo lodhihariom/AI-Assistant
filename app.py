@@ -4,6 +4,8 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from rag import build_index
+
 load_dotenv()
 
 # Dono providers OpenAI-compatible API dete hain, isliye ek hi SDK chalta hai.
@@ -37,9 +39,30 @@ with st.sidebar:
     model = st.text_input("Model", os.getenv(cfg["model_env"], cfg["default_model"]))
     system_prompt = st.text_area("System prompt", DEFAULT_SYSTEM_PROMPT, height=120)
     temperature = st.slider("Temperature", 0.0, 1.5, 0.7, 0.1)
+
+    st.divider()
+    st.subheader("📄 Documents")
+    uploads = st.file_uploader("PDF / TXT / MD upload karo", type=["pdf", "txt", "md"], accept_multiple_files=True)
+    use_docs = st.toggle("Documents se jawab do", value=True, disabled=not uploads)
+
     if st.button("Clear chat"):
         st.session_state.messages = []
         st.rerun()
+
+# Documents ka index sirf tab dobara banta hai jab files badlein.
+index = None
+if uploads:
+    sig = tuple((f.name, f.size) for f in uploads)
+    if st.session_state.get("index_sig") != sig:
+        with st.spinner("Documents padh raha hu..."):
+            st.session_state.index = build_index([(f.name, f.getvalue()) for f in uploads])
+        st.session_state.index_sig = sig
+    index = st.session_state.get("index")
+    if index is None:
+        st.sidebar.warning("Files se text nahi mila (scanned PDF ho sakti hai).")
+else:
+    st.session_state.pop("index", None)
+    st.session_state.pop("index_sig", None)
 
 api_key = os.getenv(cfg["key_env"])
 if not api_key:
@@ -59,12 +82,26 @@ if "messages" not in st.session_state:
 for m in st.session_state.messages:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
+        if m.get("sources"):
+            with st.expander("Sources"):
+                for s in m["sources"]:
+                    st.caption(f"**{s[0]}** — {s[1][:300]}...")
 
 
-def stream_reply():
-    messages = [{"role": "system", "content": system_prompt}] + st.session_state.messages
+def stream_reply(hits):
+    system = system_prompt
+    if hits:
+        context = "\n\n".join(f"[{src}]\n{text}" for src, text, _ in hits)
+        system += (
+            "\n\nUse the document excerpts below to answer. If the answer is not in them, "
+            "say so clearly instead of guessing.\n\n" + context
+        )
+    history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
     stream = client.chat.completions.create(
-        model=model, messages=messages, temperature=temperature, stream=True
+        model=model,
+        messages=[{"role": "system", "content": system}] + history,
+        temperature=temperature,
+        stream=True,
     )
     for chunk in stream:
         if chunk.choices and chunk.choices[0].delta.content:
@@ -76,13 +113,21 @@ if prompt := st.chat_input("Kuch bhi poocho..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    hits = index.search(prompt) if (index and use_docs) else []
+
     with st.chat_message("assistant"):
         try:
-            reply = st.write_stream(stream_reply())
-            st.session_state.messages.append({"role": "assistant", "content": reply})
+            reply = st.write_stream(stream_reply(hits))
+            entry = {"role": "assistant", "content": reply}
+            if hits:
+                entry["sources"] = [(s, t) for s, t, _ in hits]
+                with st.expander("Sources"):
+                    for s, t, _ in hits:
+                        st.caption(f"**{s}** — {t[:300]}...")
+            st.session_state.messages.append(entry)
         except Exception as e:
-            msg = str(e)
-            if "429" in msg:
+            st.session_state.messages.pop()  # fail hua user message hata do
+            if "429" in str(e):
                 st.error("Free limit khatam ho gayi (429). Thodi der baad try karo ya doosra provider chuno.")
             else:
-                st.error(f"Error: {msg}")
+                st.error(f"Error: {e}")

@@ -19,7 +19,12 @@ Streamlit chatbot jo free APIs (Groq / Google Gemini) use karta hai. Hindi, Engl
    streamlit run app.py
    ```
 
+## Features
+- Streaming chat, Groq / Gemini switch, editable system prompt
+- **Document Q&A:** sidebar se PDF/TXT/MD upload karo, assistant unme se dhundh kar jawab deta hai aur sources dikhata hai (free, local TF-IDF search, koi extra API nahi)
+
 ## Notes
+- Document search keyword-based hai, isliye sawal usi language/shabdon me poocho jo document me hain. Scanned (image) PDF ka text nahi padha jayega.
 - Free tiers ki limits badalti rehti hain. 429 error aaye to wait karo ya doosra provider chuno.
 - Model naam deprecate ho sakta hai. Sidebar me ya `.env` me badal sakte ho.
 - Deploy: Streamlit Community Cloud par repo connect karke keys `Secrets` me daalo.
