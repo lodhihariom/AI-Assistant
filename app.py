@@ -4,7 +4,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from rag import build_index
+from rag import build_index, chunks_from_files, load_knowledge
 
 load_dotenv()
 
@@ -29,6 +29,20 @@ DEFAULT_SYSTEM_PROMPT = (
     "(Hindi, English or Hinglish). Keep answers clear and concise."
 )
 
+ORACLE_PROMPT = (
+    "\n\nYou are also an expert in Oracle Integration Cloud (OIC), Oracle Fusion Applications "
+    "(ERP/SCM/HCM: FBDI, HDL, REST/SOAP, ESS, UCM, BIP, OTBI) and Oracle PL/SQL. Give practical, "
+    "step-by-step answers with small code/XML/SQL examples when useful. If the excerpts do not cover "
+    "something, say what you are unsure about and tell the user to verify it in the official Oracle "
+    "docs for their release instead of inventing endpoint names or parameters."
+)
+
+
+@st.cache_resource
+def get_knowledge():
+    return load_knowledge()
+
+
 st.set_page_config(page_title="My AI Assistant", page_icon="🤖")
 st.title("🤖 My AI Assistant")
 
@@ -41,29 +55,29 @@ with st.sidebar:
     temperature = st.slider("Temperature", 0.0, 1.5, 0.7, 0.1)
 
     st.divider()
+    st.subheader("🧠 Oracle knowledge")
+    kb = get_knowledge()
+    use_kb = st.toggle("Oracle expert mode (OIC / Fusion / PL/SQL)", value=True, disabled=not kb)
+    st.caption(f"{len(kb)} knowledge chunks loaded (knowledge/ + knowledge_cache/)")
+
+    st.divider()
     st.subheader("📄 Documents")
     uploads = st.file_uploader("PDF / TXT / MD upload karo", type=["pdf", "txt", "md"], accept_multiple_files=True)
-    use_docs = st.toggle("Documents se jawab do", value=True, disabled=not uploads)
-
+    
     if st.button("Clear chat"):
         st.session_state.messages = []
         st.rerun()
 
-# Documents ka index sirf tab dobara banta hai jab files badlein.
-index = None
-if uploads:
-    sig = tuple((f.name, f.size) for f in uploads)
-    if st.session_state.get("index_sig") != sig:
-        with st.spinner("Documents padh raha hu..."):
-            st.session_state.index = build_index([(f.name, f.getvalue()) for f in uploads])
-        st.session_state.index_sig = sig
-    index = st.session_state.get("index")
-    if index is None:
-        st.sidebar.warning("Files se text nahi mila (scanned PDF ho sakti hai).")
-else:
-    st.session_state.pop("index", None)
-    st.session_state.pop("index_sig", None)
-
+# Index sirf tab dobara banta hai jab uploads ya KB mode badle.
+sig = (bool(use_kb), tuple((f.name, f.size) for f in (uploads or [])))
+if st.session_state.get("index_sig") != sig:
+    with st.spinner("Knowledge tayyar kar raha hu..."):
+        all_chunks = (list(kb) if use_kb else []) + (
+            chunks_from_files([(f.name, f.getvalue()) for f in uploads]) if uploads else []
+        )
+        st.session_state.index = build_index(all_chunks)
+    st.session_state.index_sig = sig
+index = st.session_state.get("index")
 api_key = os.getenv(cfg["key_env"])
 if not api_key:
     try:
@@ -89,7 +103,7 @@ for m in st.session_state.messages:
 
 
 def stream_reply(hits):
-    system = system_prompt
+    system = system_prompt + (ORACLE_PROMPT if use_kb else "")
     if hits:
         context = "\n\n".join(f"[{src}]\n{text}" for src, text, _ in hits)
         system += (
@@ -113,7 +127,7 @@ if prompt := st.chat_input("Kuch bhi poocho..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    hits = index.search(prompt) if (index and use_docs) else []
+    hits = index.search(prompt, k=5) if index else []
 
     with st.chat_message("assistant"):
         try:

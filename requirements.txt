@@ -3,3 +3,5 @@ openai>=1.50
 python-dotenv>=1.0
 pypdf>=5.0
 scikit-learn>=1.5
+requests>=2.31
+beautifulsoup4>=4.12

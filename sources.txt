@@ -1,0 +1,21 @@
+# Official Oracle docs jinhe ingest.py local machine par padh kar knowledge_cache/ me save karega.
+# Ye cache GitHub par push nahi hota (.gitignore me hai), kyunki docs Oracle ki copyright content hain.
+# Release number (24d, 23, ...) naya ho sakta hai; 404 aaye to script skip kar deta hai.
+
+# --- Oracle Integration (OIC) ---
+https://docs.oracle.com/en/cloud/paas/integration-cloud/integrations-user/understand-how-integrations-work.html
+https://docs.oracle.com/en/cloud/paas/integration-cloud/erp-adapter/invoke-operation-page.html
+
+# --- Fusion ERP Integration Service (SOAP + REST) ---
+https://docs.oracle.com/en/cloud/saas/financials/24d/oeswf/erpintegrationservice-d16509e420.html
+https://docs.oracle.com/en/cloud/saas/financials/24c/farfa/op-erpintegrations-post.html
+
+# --- PL/SQL Language Reference (23ai) ---
+https://docs.oracle.com/en/database/oracle/oracle-database/23/lnpls/preface.html
+https://docs.oracle.com/en/database/oracle/oracle-database/23/lnpls/plsql-error-handling.html
+https://docs.oracle.com/en/database/oracle/oracle-database/23/lnpls/plsql-collections-and-records.html
+https://docs.oracle.com/en/database/oracle/oracle-database/23/lnpls/plsql-optimization-and-tuning.html
+https://docs.oracle.com/en/database/oracle/oracle-database/23/lnpls/dynamic-sql.html
+
+# --- GitHub (URL se nahi, clone se): python ingest.py github oracle/cloud-asset-fusion-serverless-vbcs-sample
+# Dusre useful sources: https://github.com/topics/oraclefusionapps , https://github.com/oracle-samples
